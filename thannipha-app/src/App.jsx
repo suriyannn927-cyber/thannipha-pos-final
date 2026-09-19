@@ -10,7 +10,7 @@ import {
   HandCoins, CalendarClock, RotateCcw, Truck, ClipboardList, Database, MapPin, ScanLine, QrCode
 } from "lucide-react";
 
-// --- ข้อมูลจำลองเริ่มต้น ---
+// --- ข้อมูลเริ่มต้น (ตัวอย่างตอนติดตั้งร้านครั้งแรก) ---
 const initialProducts = [
   { id: 1, barcode: "1001", name: "กล้อง กข.43", category: "ข้าวโล", cost: 28.0, price: 55.0, stock: 50, lastChecked: null },
   { id: 2, barcode: "1002", name: "ข้าวกล้องแดง", category: "ข้าวโล", cost: 42.0, price: 69.0, stock: 50, lastChecked: null },
@@ -24,7 +24,7 @@ const initialSettings = {
 };
 const initialSuppliers = [{ id: 1, name: "ซัพพลายเออร์ A (ตลาดไท)" }, { id: 2, name: "บริษัท ส่งข้าว จำกัด" }];
 
-// --- Helper Functions สำหรับ Export ---
+// --- Helper Functions สำหรับโหลดเป็นไฟล์ Excel และ PDF ---
 const exportToCSV = (headers, rows, filename) => {
   const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(","))].join("\n");
   const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -52,8 +52,9 @@ const ExportButtons = ({ onCSV, onPDF }) => (
   </div>
 );
 
-const callGeminiAPI = async (prompt) => { return "ฟีเจอร์ AI วิเคราะห์ (ระบบ Demo)"; };
+const callGeminiAPI = async (prompt) => { return "ฟีเจอร์ AI วิเคราะห์ (ระบบจำลอง กรุณาใส่ API Key จริงเพื่อเปิดใช้งาน)"; };
 
+// --- 🌟 APP COMPONENT หลัก 🌟 ---
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem("currentUser");
@@ -63,10 +64,10 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDesktopMenuCollapsed, setIsDesktopMenuCollapsed] = useState(false);
   
-  // 🌟 ระบบจัดการสาขา
+  // จัดการสาขา
   const [currentBranch, setCurrentBranch] = useState("1"); 
 
-  // --- 🌐 ระบบ State ดึงข้อมูลจาก Cloud (Firebase) ---
+  // State เก็บข้อมูลทั้งหมด
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [salesHistory, setSalesHistory] = useState([]);
@@ -80,9 +81,9 @@ export default function App() {
   const [debtPayments, setDebtPayments] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [conversionRequests, setConversionRequests] = useState([]); // 🌟 ใหม่: ระบบอนุมัติแปลงสินค้า
+  const [conversionRequests, setConversionRequests] = useState([]); 
 
-  // --- 🌐 ระบบดึงข้อมูล Real-time จาก Firebase ---
+  // ดึงข้อมูล Real-time จาก Firebase
   useEffect(() => {
     const unsubs = [
       onSnapshot(collection(db, "products"), (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
@@ -119,7 +120,7 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // --- 🌟 คัดกรองข้อมูลตามสาขา ---
+  // คัดกรองข้อมูลให้แสดงเฉพาะสาขาที่เลือก
   const branchProducts = products.filter(p => p.branch === currentBranch);
   const branchSalesHistory = salesHistory.filter(s => s.branch === currentBranch);
   const branchAccountingEntries = accountingEntries.filter(a => a.branch === currentBranch);
@@ -129,11 +130,11 @@ export default function App() {
   const currentShiftState = shiftState[`branch_${currentBranch}`] || { isOpen: false, startTime: null, startingCash: 0 };
   const currentSettings = settings[`branch_${currentBranch}`] || initialSettings;
 
-  // --- 🌐 ฟังก์ชันบันทึกข้อมูล ---
+  // ฟังก์ชันบันทึก/ลบ ข้อมูลลงฐานข้อมูล Cloud
   const saveToDB = async (col, id, data) => { try { await setDoc(doc(db, col, String(id)), data, { merge: true }); } catch (e) { console.error("DB Error:", e); } };
   const delFromDB = async (col, id) => { try { await deleteDoc(doc(db, col, String(id))); } catch (e) { console.error("DB Error:", e); } };
 
-  // สินค้า, การขาย, บัญชี, รับเข้า แยกตามสาขา
+  // บันทึกแบบระบุสาขา
   const addProduct = (p) => saveToDB("products", p.id, p.branch ? p : { ...p, branch: currentBranch });
   const updateProduct = addProduct;
   const deleteProduct = (id) => delFromDB("products", id);
@@ -147,7 +148,7 @@ export default function App() {
   const addReceipt = (r) => saveToDB("receipts", r.id, { ...r, branch: currentBranch });
   const deleteSupplier = (id) => delFromDB("suppliers", id);
 
-  // ลูกค้า, ลูกหนี้, ซัพพลายเออร์ ใช้ร่วมกันทุกสาขา
+  // บันทึกแบบแชร์ทุกสาขา (ลูกค้า, ลูกหนี้, ขออนุมัติแปลงสินค้า)
   const addCustomer = (c) => saveToDB("customers", c.id, c);
   const updateCustomer = addCustomer;
   const deleteCustomer = (id) => delFromDB("customers", id);
@@ -157,34 +158,27 @@ export default function App() {
   const addDebtPayment = (p) => saveToDB("debtPayments", p.id, p); 
   const addSupplier = (s) => saveToDB("suppliers", s.id, s);
 
-  // ระบบอนุมัติแปลงสินค้า
   const addConversionRequest = (req) => saveToDB("conversions", req.id, { ...req, branch: currentBranch, status: "pending" });
   const approveConversion = (req) => saveToDB("conversions", req.id, { ...req, status: "approved" });
   const rejectConversion = (req) => saveToDB("conversions", req.id, { ...req, status: "rejected" });
 
-  // 🌟 ฟังก์ชันพิเศษ: ยกเลิกบิลและคืนสต๊อก
+  // ฟังก์ชันพิเศษ: ยกเลิกบิลและคืนสต๊อก (แอดมิน)
   const handleVoidSale = (sale) => {
     if (!window.confirm(`ยืนยันการยกเลิกบิล ${sale.id} และคืนสต๊อกสินค้าทั้งหมดกลับเข้าคลังใช่หรือไม่?\n\n(ยอดขายและรายการนี้จะถูกลบออกจากประวัติ)`)) return;
-    
-    // คืนสต๊อก
     (sale.items || []).forEach(item => {
       const product = branchProducts.find(p => p.id === item.id);
-      if (product) {
-        updateProduct({ ...product, stock: product.stock + item.qty });
-      }
+      if (product) updateProduct({ ...product, stock: product.stock + item.qty });
     });
-    
-    // ลบบิลทิ้ง
     delFromDB("salesHistory", sale.id);
     alert(`ยกเลิกบิล ${sale.id} และคืนสต๊อกเรียบร้อยแล้ว`);
   };
 
-  // พนักงานและแอดมิน
   const addAdmin = (a) => saveToDB("admins", a.username, a);
   const deleteAdmin = (id) => delFromDB("admins", id);
   const addEmployee = (e) => saveToDB("employees", e.pin, e); 
   const deleteEmployee = (id) => delFromDB("employees", id);
   
+  // ฟังก์ชันตั้งร้านครั้งแรก (Seed Data)
   const loadInitialDataToFirebase = () => {
     if(window.confirm(`ยืนยันการโหลดข้อมูลสินค้าตัวอย่าง เข้าสู่ "สาขา ${currentBranch}"?`)) {
       initialProducts.forEach(p => addProduct({ ...p, branch: currentBranch }));
@@ -194,6 +188,7 @@ export default function App() {
     }
   };
 
+  // ฟังก์ชันกู้คืนระบบจากไฟล์ Backup JSON
   const handleFullRestore = (data) => {
     if (!window.confirm("⚠️ คำเตือน: ระบบจะเขียนทับข้อมูลทั้งหมด ยืนยันหรือไม่?")) return;
     try {
@@ -208,6 +203,7 @@ export default function App() {
     } catch (err) { alert("เกิดข้อผิดพลาดในการกู้คืน: " + err.message); }
   };
 
+  // จัดการการเข้าระบบ
   const handleLogin = (user) => {
     setCurrentUser(user);
     if (user.role === "employee" && user.branch) setCurrentBranch(user.branch);
@@ -217,17 +213,15 @@ export default function App() {
   if (!currentUser) return <LoginScreen onLogin={handleLogin} admins={admins} employees={employees} />;
 
   const isOwner = currentUser.role === "owner";
-  const isAdmin = currentUser.role === "admin";
   const isEmployee = currentUser.role === "employee";
   const navigateTo = (tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); };
 
   const allDatabaseData = { products: branchProducts, customers, salesHistory: branchSalesHistory, accountingEntries: branchAccountingEntries, admins, employees, shiftHistory: branchShiftHistory, debtors, debtPayments, receipts: branchReceipts, suppliers, settings: currentSettings };
-
-  // แจ้งเตือนแอดมินถ้ามีการขอแปลงสินค้า
   const pendingConversionsCount = branchConversions.filter(c => c.status === "pending").length;
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
+      {/* 🌟 Header มือถือ */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-800 text-white flex items-center justify-between px-4 z-30 shadow-md">
         <div className="flex flex-col">
           <h1 className="text-lg font-bold text-green-400 leading-tight">sUriYaN<span className="text-white">_POS_</span></h1>
@@ -241,6 +235,7 @@ export default function App() {
 
       {isMobileMenuOpen && <div className="md:hidden fixed inset-0 bg-black/50 z-20" onClick={() => setIsMobileMenuOpen(false)}></div>}
 
+      {/* 🌟 แถบเมนูด้านซ้าย (Sidebar) */}
       <aside className={`fixed md:static inset-y-0 left-0 z-30 bg-slate-800 text-white flex flex-col shadow-xl transition-all duration-300 ${isMobileMenuOpen ? "translate-x-0 w-64" : `-translate-x-full md:translate-x-0 ${isDesktopMenuCollapsed ? "md:w-20" : "md:w-64"}`}`}>
         <div className="p-4 md:p-6 text-center border-b border-slate-700 hidden md:flex flex-col items-center relative">
           {!isDesktopMenuCollapsed ? (
@@ -255,13 +250,8 @@ export default function App() {
         {!isEmployee && !isDesktopMenuCollapsed && (
           <div className="px-4 py-3 bg-slate-900 border-b border-slate-700">
             <label className="text-[10px] text-slate-400 font-bold block mb-1 flex items-center"><MapPin size={12} className="mr-1"/> สาขาที่ดูแล</label>
-            <select
-               value={currentBranch}
-               onChange={(e) => setCurrentBranch(e.target.value)}
-               className="w-full bg-slate-700 text-white p-2 rounded text-sm font-bold outline-none border border-slate-600 focus:border-green-500 transition-colors"
-            >
-              <option value="1">📍 สาขาที่ 1</option>
-              <option value="2">📍 สาขาที่ 2</option>
+            <select value={currentBranch} onChange={(e) => setCurrentBranch(e.target.value)} className="w-full bg-slate-700 text-white p-2 rounded text-sm font-bold outline-none border border-slate-600 focus:border-green-500 transition-colors">
+              <option value="1">📍 สาขาที่ 1</option><option value="2">📍 สาขาที่ 2</option>
             </select>
           </div>
         )}
@@ -271,13 +261,11 @@ export default function App() {
           <SidebarItem icon={<Store size={20} />} label="เปิด-ปิดกะ" active={currentTab === "shift"} onClick={() => navigateTo("shift")} collapsed={isDesktopMenuCollapsed && !isMobileMenuOpen} />
           <SidebarItem icon={<BookUser size={20} />} label="ระบบลูกหนี้" active={currentTab === "debtors"} onClick={() => navigateTo("debtors")} collapsed={isDesktopMenuCollapsed && !isMobileMenuOpen} />
           
-          {/* เมนูคลังสินค้า มี Notification */}
+          {/* เมนูคลังสินค้า (มีแจ้งเตือนเวลามีคำขออนุมัติ) */}
           <button onClick={() => navigateTo("inventory")} className={`flex items-center w-full p-3 rounded-md font-medium transition-all relative ${currentTab === "inventory" ? "bg-green-600 text-white shadow" : "text-slate-300 hover:bg-slate-700 hover:text-white"} ${isDesktopMenuCollapsed && !isMobileMenuOpen ? "justify-center" : ""}`}>
             <span className={isDesktopMenuCollapsed && !isMobileMenuOpen ? "" : "mr-3"}><Package size={20} /></span>
             {!(isDesktopMenuCollapsed && !isMobileMenuOpen) && <span>คลังสินค้า</span>}
-            {pendingConversionsCount > 0 && !isEmployee && (
-              <span className={`absolute ${isDesktopMenuCollapsed && !isMobileMenuOpen ? "top-1 right-1" : "right-3"} bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>{pendingConversionsCount}</span>
-            )}
+            {pendingConversionsCount > 0 && !isEmployee && (<span className={`absolute ${isDesktopMenuCollapsed && !isMobileMenuOpen ? "top-1 right-1" : "right-3"} bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>{pendingConversionsCount}</span>)}
           </button>
 
           <SidebarItem icon={<UserPlus size={20} />} label="ระบบลูกค้า" active={currentTab === "customers"} onClick={() => navigateTo("customers")} collapsed={isDesktopMenuCollapsed && !isMobileMenuOpen} />
@@ -307,15 +295,14 @@ export default function App() {
         </div>
       </aside>
 
+      {/* 🌟 พื้นที่แสดงผลตรงกลาง (Main Content) */}
       <main className="flex-1 overflow-hidden flex flex-col pt-16 md:pt-0 w-full relative bg-gray-100">
         <div className="flex-1 overflow-hidden flex flex-col">
           {currentTab === "pos" && <POSSystem products={branchProducts} updateProduct={updateProduct} customers={customers} updateCustomer={updateCustomer} currentUser={currentUser} onSaleComplete={addSale} settings={currentSettings} shiftState={currentShiftState} onNavigate={navigateTo} onAddDebtor={addDebtor} />}
           {currentTab === "shift" && <ShiftManagement shiftState={currentShiftState} setShiftState={updateShiftState} salesHistory={branchSalesHistory} currentUser={currentUser} shiftHistory={branchShiftHistory} setShiftHistory={addShiftHistory} debtPayments={debtPayments} />}
           {currentTab === "debtors" && <DebtorManager debtors={debtors} updateDebtor={updateDebtor} deleteDebtor={deleteDebtor} addDebtor={addDebtor} customers={customers} debtPayments={debtPayments} addDebtPayment={addDebtPayment} currentUser={currentUser} currentBranch={currentBranch} />}
           {currentTab === "receive" && !isEmployee && <GoodsReceiptManager products={branchProducts} updateProduct={updateProduct} addReceipt={addReceipt} currentUser={currentUser} suppliers={suppliers} addSupplier={addSupplier} deleteSupplier={deleteSupplier} />}
-          
           {currentTab === "inventory" && <InventoryManager products={branchProducts} addProduct={addProduct} updateProduct={updateProduct} deleteProduct={deleteProduct} currentUser={currentUser} currentBranch={currentBranch} conversionRequests={branchConversions} addConversionRequest={addConversionRequest} approveConversion={approveConversion} rejectConversion={rejectConversion} />}
-          
           {currentTab === "customers" && <CustomerManager customers={customers} addCustomer={addCustomer} updateCustomer={updateCustomer} deleteCustomer={deleteCustomer} currentUser={currentUser} />}
           {currentTab === "dashboard" && !isEmployee && <Dashboard salesHistory={branchSalesHistory} products={branchProducts} currentBranch={currentBranch} />}
           {currentTab === "accounting" && !isEmployee && <AccountingDashboard salesHistory={branchSalesHistory} accountingEntries={branchAccountingEntries} addAccounting={addAccounting} deleteAccounting={deleteAccounting} currentBranch={currentBranch} />}
@@ -536,7 +523,7 @@ function ShiftManagement({ shiftState, setShiftState, salesHistory, currentUser,
 }
 
 // ------------------------------------------
-// 1. ระบบขายสินค้า (POS) - รองรับ Barcode, จำนวนแก้ได้, อักษรใหญ่ขึ้น
+// 1. ระบบขายสินค้า (POS) - 🌟 ลากสลับตำแหน่ง ทศนิยม และ สแกนเนอร์
 // ------------------------------------------
 function POSSystem({ products, updateProduct, customers, updateCustomer, currentUser, onSaleComplete, settings, shiftState, onNavigate, onAddDebtor }) {
   const [cart, setCart] = useState([]);
@@ -554,14 +541,16 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [mobileView, setMobileView] = useState(0);
 
-  // 🌟 ดักจับเครื่องสแกนบาร์โค้ด
+  // 🌟 State สำหรับระบบลากสลับตำแหน่ง (Drag & Drop)
+  const [draggedItemIdx, setDraggedItemIdx] = useState(null);
+
   useEffect(() => {
     if (!shiftState?.isOpen) return;
     let barcodeBuffer = "";
     let lastKeyTime = Date.now();
 
     const handleKeyDown = (e) => {
-      if (!settings?.hardware?.scannerEnabled) return; // เช็คเปิด/ปิดสแกนเนอร์ในการตั้งค่า
+      if (!settings?.hardware?.scannerEnabled) return; 
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
       const currentTime = Date.now();
@@ -660,29 +649,49 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
 
   const removeFromCart = (id) => setCart((prev) => prev.filter((item) => item.id !== id));
   
-  const updateQty = (id, delta) => setCart((prev) => prev.map((item) => {
-    if (item.id === id) {
-      const p = (products || []).find((x) => x.id === id);
-      const n = item.qty + delta;
-      if (n > 0 && n <= p.stock) return { ...item, qty: n };
-    }
-    return item;
-  }));
-
   const handleDirectQtyChange = (id, val) => {
-    let newQty = parseInt(val, 10);
-    if (isNaN(newQty) || newQty < 1) newQty = 1;
+    let newQty = parseFloat(val); // 🌟 รองรับทศนิยม
+    if (isNaN(newQty) || newQty < 0.01) newQty = 1;
     setCart((prev) => prev.map((item) => {
       if (item.id === id) {
         const p = (products || []).find((x) => x.id === id);
         if (p && newQty <= p.stock) return { ...item, qty: newQty };
         else if (p && newQty > p.stock) {
-           alert(`มีสต๊อกสูงสุดแค่ ${p.stock} ชิ้น`);
+           alert(`มีสต๊อกสูงสุดแค่ ${p.stock}`);
            return { ...item, qty: p.stock }; 
         }
       }
       return item;
     }));
+  };
+
+  const updateQty = (id, delta) => {
+    setCart((prev) => prev.map((item) => {
+      if (item.id === id) {
+        const p = (products || []).find((x) => x.id === id);
+        const n = item.qty + delta;
+        if (n > 0 && n <= p.stock) return { ...item, qty: n };
+      }
+      return item;
+    }));
+  };
+
+  // 🌟 ฟังก์ชันจัดการ Drag & Drop สลับลำดับตะกร้า
+  const handleDragStart = (e, idx) => {
+    setDraggedItemIdx(idx);
+  };
+  const handleDragOver = (e) => {
+    e.preventDefault(); 
+  };
+  const handleDrop = (e, dropIdx) => {
+    e.preventDefault();
+    if (draggedItemIdx === null || draggedItemIdx === dropIdx) return;
+    const newCart = [...cart];
+    const draggedItem = newCart[draggedItemIdx];
+    newCart.splice(draggedItemIdx, 1);
+    newCart.splice(dropIdx, 0, draggedItem);
+    setCart(newCart);
+    setDraggedItemIdx(null);
   };
 
   const handleCheckout = () => {
@@ -768,7 +777,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
             </div>
           )}
           
-          {/* รองรับ QR Code PromptPay ถ้าเปิดตั้งค่าไว้ */}
           {settings?.hardware?.qrWalletEnabled && showReceipt.paymentMethod === "transfer" && (
              <div className="mt-4 text-center border-t border-dashed pt-4 print:border-black">
                 <QrCode size={64} className="mx-auto text-gray-800 print:text-black"/>
@@ -796,7 +804,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
         <button onClick={() => setMobileView(1)} className={`flex-1 py-3 font-bold ${mobileView === 1 ? "text-green-600 border-b-2 border-green-600" : "text-gray-500"}`}>ตะกร้า ({cart.length})</button>
       </div>
 
-      {/* ฝั่งเลือกสินค้า */}
       <div className={`flex-1 flex flex-col bg-gray-50 md:border-r h-full ${mobileView === 0 ? "block" : "hidden md:flex"}`}>
         <div className="p-3 bg-white shadow-sm flex items-center gap-4 z-10 relative">
           <ScanLine className="text-gray-400" size={20} />
@@ -834,14 +841,12 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
         </div>
       </div>
 
-      {/* ฝั่งตะกร้าสินค้า */}
       <div className={`w-full md:w-[400px] lg:w-[450px] bg-white flex flex-col shadow-2xl md:shadow-none border-l z-10 h-full ${mobileView === 1 ? "block" : "hidden md:flex"}`}>
         <div className="p-3 md:p-4 bg-slate-800 text-white font-bold flex justify-between items-center shrink-0">
           <div className="flex items-center"><ShoppingCart className="mr-2" size={18} /> ตะกร้าสินค้า</div>
           <span className="bg-slate-700 px-2 py-0.5 rounded text-xs md:text-sm">{cart.length} รายการ</span>
         </div>
         
-        {/* ระบบสมาชิก */}
         <div className="p-2 md:p-3 bg-blue-50 border-b shrink-0">
           {selectedCustomer ? (
             <div className="flex justify-between items-center bg-white p-2 md:p-3 rounded-lg shadow-sm border border-blue-200 relative overflow-hidden">
@@ -866,7 +871,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
           )}
         </div>
 
-        {/* รายการในตะกร้า 🌟 อัปเกรดช่องพิมพ์ตัวเลข */}
         <div className="flex-1 overflow-y-auto p-2 md:p-3 bg-gray-50">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2 md:space-y-4">
@@ -874,19 +878,28 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
               <p className="font-medium text-sm md:text-base">ตะกร้าว่างเปล่า</p>
             </div>
           ) : (
-            cart.map((item) => (
-              <div key={item.id} className="bg-white p-2 md:p-3 mb-2 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center relative animate-in slide-in-from-right-4">
+            cart.map((item, idx) => (
+              <div 
+                key={item.id} 
+                draggable 
+                onDragStart={(e) => handleDragStart(e, idx)} 
+                onDragOver={handleDragOver} 
+                onDrop={(e) => handleDrop(e, idx)}
+                className="bg-white p-2 md:p-3 mb-2 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center relative transition-transform hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"
+                title="คลิกค้างเพื่อลากสลับตำแหน่ง"
+              >
+                <div className="mr-2 text-gray-300"><Menu size={20} /></div>
                 <div className="flex-1 pr-2">
                   <div className="font-bold text-gray-800 text-xs md:text-sm leading-tight mb-1">{item.name}</div>
                   <div className="text-[10px] md:text-xs text-green-600 font-medium border border-green-200 bg-green-50 px-1.5 py-0.5 rounded inline-block">฿{item.price}/ชิ้น</div>
                 </div>
                 <div className="flex flex-col items-end gap-1 md:gap-2">
-                  {/* 🌟 ช่องจำนวน พิมพ์เลขได้เลย */}
                   <div className="flex bg-gray-50 border border-gray-200 rounded-lg overflow-hidden shadow-inner h-8 md:h-10">
                     <button onClick={() => updateQty(item.id, -1)} className="px-3 md:px-4 bg-gray-200 hover:bg-gray-300 font-black text-gray-700 transition-colors">-</button>
                     <input 
                        type="number" 
-                       min="1"
+                       step="any"
+                       min="0.01"
                        value={item.qty} 
                        onChange={(e) => handleDirectQtyChange(item.id, e.target.value)} 
                        className="w-12 md:w-16 flex items-center justify-center font-black text-sm md:text-base text-gray-800 bg-white text-center outline-none focus:border-blue-500" 
@@ -901,7 +914,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
           )}
         </div>
 
-        {/* 🌟 สรุปยอดและชำระเงิน (ขยายตัวหนังสือใหญ่เท่ากัน) */}
         <div className="p-2 md:p-4 bg-white border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 shrink-0">
           <div className="space-y-1 mb-2">
             <div className="flex justify-between items-center text-gray-700 text-base md:text-lg font-bold">
@@ -919,11 +931,10 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
             )}
             {usedPoints > 0 && (<div className="flex justify-between text-sm md:text-base text-orange-600 font-bold px-1"><span>ลดจากแต้ม</span><span>- ฿{pointDiscount.toLocaleString()}</span></div>)}
             
-            {/* 🌟 ช่องลดพิเศษ ขยายใหญ่ */}
             <div className="flex justify-between items-center text-gray-700 text-base md:text-lg font-bold">
               <span>ลดเพิ่ม (บาท)</span>
               <div className="relative w-20 md:w-28">
-                <input type="number" min="0" value={discount || ""} onChange={(e) => setDiscount(Number(e.target.value))} className="w-full px-2 py-1 text-right border border-gray-300 rounded-lg outline-none focus:border-red-500 font-black text-red-500 bg-red-50" placeholder="0" />
+                <input type="number" min="0" step="any" value={discount || ""} onChange={(e) => setDiscount(Number(e.target.value))} className="w-full px-2 py-1 text-right border border-gray-300 rounded-lg outline-none focus:border-red-500 font-black text-red-500 bg-red-50" placeholder="0" />
               </div>
             </div>
 
@@ -946,7 +957,7 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
               <div className="flex justify-between items-center mb-1.5">
                 <label className="text-[10px] md:text-xs font-bold text-gray-600">รับเงินมา (บาท)</label>
               </div>
-              <input type="number" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xl md:text-2xl text-right border border-gray-300 rounded-lg focus:border-blue-500 font-black outline-none shadow-inner bg-white mb-2" placeholder="0" />
+              <input type="number" step="any" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xl md:text-2xl text-right border border-gray-300 rounded-lg focus:border-blue-500 font-black outline-none shadow-inner bg-white mb-2" placeholder="0" />
               
               <div className="grid grid-cols-4 gap-1.5 w-full">
                   <button onClick={() => setCashReceived(total.toString())} className="py-2 bg-white border border-gray-300 font-bold text-gray-700 rounded-md shadow-sm text-[10px] md:text-sm">พอดี</button>
@@ -1155,14 +1166,14 @@ function DebtorManager({ debtors, updateDebtor, deleteDebtor, addDebtor, custome
 }
 
 // ------------------------------------------
-// 2. ระบบจัดการคลังสินค้า (Inventory) - เพิ่มขออนุมัติ & พิมพ์บาร์โค้ด
+// 2. ระบบจัดการคลังสินค้า (Inventory) - รองรับทศนิยม & ปรับราคา & แจ้งเตือน
 // ------------------------------------------
 function InventoryManager({ products, addProduct, updateProduct, deleteProduct, currentUser, currentBranch, conversionRequests, addConversionRequest, approveConversion, rejectConversion }) {
   const isEmployee = currentUser.role === "employee";
   const [isEditing, setIsEditing] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [showRequestModal, setShowRequestModal] = useState(false); // Modal สำหรับแอดมินดูคำขอ
-  const [convertData, setConvertData] = useState({ sourceId: "", targetId: "", sourceQty: 1, targetQty: 1 });
+  const [showRequestModal, setShowRequestModal] = useState(false); 
+  const [convertData, setConvertData] = useState({ sourceId: "", targetId: "", sourceQty: 1, targetQty: 1, targetPrice: "" });
   const [formData, setFormData] = useState({ id: null, barcode: "", name: "", category: "", cost: "", price: "", stock: "" });
   const [generatedCaption, setGeneratedCaption] = useState("");
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
@@ -1178,7 +1189,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
     setFormData({ ...formData, barcode: String(lastBarcode + 1).padStart(8, "0") });
   };
 
-  // 🌟 ฟังก์ชันพิมพ์บาร์โค้ด
   const handlePrintBarcode = (product) => {
     if (!product.barcode) return alert("สินค้านี้ยังไม่มีรหัสบาร์โค้ด กรุณาแก้ไขเพื่อเพิ่มรหัสก่อนครับ");
     const printWindow = window.open("", "", "height=500,width=400");
@@ -1220,7 +1230,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const dataToSave = { ...formData, cost: Number(formData.cost), price: Number(formData.price), stock: Number(formData.stock) };
+    const dataToSave = { ...formData, cost: parseFloat(formData.cost), price: parseFloat(formData.price), stock: parseFloat(formData.stock) };
     if (formData.id) updateProduct(dataToSave); else addProduct({ ...dataToSave, id: Date.now(), lastChecked: null });
     setIsEditing(false);
   };
@@ -1230,13 +1240,16 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
     if (p) updateProduct({ ...p, lastChecked: new Date().toLocaleString("th-TH") });
   };
 
-  // 🌟 ฟังก์ชันจัดการการแปลง (พนักงานส่งคำขอ / แอดมินแปลงเลย)
   const executeConversion = (e) => {
     e.preventDefault();
     const source = (products || []).find((p) => p.id === parseInt(convertData.sourceId));
     const target = (products || []).find((p) => p.id === parseInt(convertData.targetId));
+    const sQty = parseFloat(convertData.sourceQty);
+    const tQty = parseFloat(convertData.targetQty);
+    const newPrice = parseFloat(convertData.targetPrice);
+
     if (!source || !target) return alert("กรุณาเลือกสินค้าให้ครบถ้วน");
-    if (source.stock < convertData.sourceQty) return alert(`สต๊อก ${source.name} ไม่เพียงพอ (มี ${source.stock})`);
+    if (source.stock < sQty) return alert(`สต๊อก ${source.name} ไม่เพียงพอ (มี ${source.stock})`);
     if (source.id === target.id) return alert("ไม่สามารถแปลงเป็นสินค้าชนิดเดียวกันได้");
     
     if (isEmployee) {
@@ -1246,32 +1259,40 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
         sourceName: source.name,
         targetId: target.id,
         targetName: target.name,
-        sourceQty: parseInt(convertData.sourceQty),
-        targetQty: parseInt(convertData.targetQty),
+        sourceQty: sQty,
+        targetQty: tQty,
+        targetPrice: newPrice || null,
         requestedBy: currentUser.name || currentUser.username,
         timestamp: Date.now()
       });
-      alert("✅ ส่งคำขออนุมัติแปลงสินค้าไปให้ 'แอดมิน' เรียบร้อยแล้ว (สต๊อกจะเปลี่ยนเมื่อได้รับการอนุมัติ)");
+      alert("✅ ส่งคำขออนุมัติแปลงสินค้าไปให้ 'แอดมิน' เรียบร้อยแล้ว");
       setShowConvertModal(false);
     } else {
-      if (window.confirm(`ยืนยันการแปลง: หัก ${source.name} จำนวน ${convertData.sourceQty} ไปเพิ่มเป็น ${target.name} จำนวน ${convertData.targetQty} ใช่หรือไม่?`)) {
-        updateProduct({ ...source, stock: source.stock - parseInt(convertData.sourceQty) });
-        updateProduct({ ...target, stock: target.stock + parseInt(convertData.targetQty) });
+      if (window.confirm(`ยืนยันการแปลง: หัก ${source.name} จำนวน ${sQty} ไปเพิ่มเป็น ${target.name} จำนวน ${tQty} ใช่หรือไม่?`)) {
+        updateProduct({ ...source, stock: source.stock - sQty });
+        updateProduct({ 
+          ...target, 
+          stock: target.stock + tQty, 
+          price: convertData.targetPrice ? newPrice : target.price 
+        });
         setShowConvertModal(false);
       }
     }
   };
 
-  // 🌟 ฟังก์ชันแอดมินอนุมัติ/ปฏิเสธคำขอ
   const handleApproveRequest = (req) => {
     const source = (products || []).find((p) => p.id === req.sourceId);
     const target = (products || []).find((p) => p.id === req.targetId);
     if (!source || !target) return alert("ไม่พบข้อมูลสินค้าต้นทางหรือปลายทาง");
     if (source.stock < req.sourceQty) return alert(`❌ อนุมัติไม่ได้! สต๊อก ${source.name} ปัจจุบันไม่เพียงพอ (เหลือแค่ ${source.stock})`);
     
-    if (window.confirm(`ยืนยันอนุมัติคำขอแปลง ${source.name} จำนวน ${req.sourceQty} ชิ้น?`)) {
+    if (window.confirm(`ยืนยันอนุมัติคำขอแปลง ${source.name} จำนวน ${req.sourceQty}?`)) {
       updateProduct({ ...source, stock: source.stock - req.sourceQty });
-      updateProduct({ ...target, stock: target.stock + req.targetQty });
+      updateProduct({ 
+        ...target, 
+        stock: target.stock + req.targetQty,
+        price: req.targetPrice ? req.targetPrice : target.price 
+      });
       approveConversion(req);
       alert("✅ อนุมัติและตัดสต๊อกเรียบร้อยแล้ว");
     }
@@ -1302,7 +1323,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
           const cols = parseCSVRow(lines[i]).map((c) => c.trim());
           if (cols.length >= 6) {
             const barcode = cols[0]; const name = cols[1]; const category = cols[2] || "ทั่วไป";
-            const cost = parseFloat(cols[3].replace(/,/g, "")) || 0; const price = parseFloat(cols[4].replace(/,/g, "")) || 0; const stock = parseInt(cols[5].replace(/,/g, ""), 10) || 0;
+            const cost = parseFloat(cols[3].replace(/,/g, "")) || 0; const price = parseFloat(cols[4].replace(/,/g, "")) || 0; const stock = parseFloat(cols[5].replace(/,/g, "")) || 0;
             if (barcode && name) {
               const existingP = (products || []).find((p) => p.barcode === barcode);
               const newData = { barcode, name, category, cost, price, stock, lastChecked: null };
@@ -1335,7 +1356,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                 <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
                 <button onClick={() => fileInputRef.current.click()} className="flex-1 md:flex-none justify-center bg-teal-100 text-teal-700 hover:bg-teal-200 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm" title="นำเข้าข้อมูลจากไฟล์ CSV"><Upload size={16} className="mr-1" /> <span className="hidden sm:inline">นำเข้า Excel</span><span className="sm:hidden">นำเข้า</span></button>
                 
-                {/* 🌟 ปุ่มแจ้งเตือนคำขออนุมัติ สำหรับแอดมิน */}
                 <button onClick={() => setShowRequestModal(true)} className="relative flex-1 md:flex-none justify-center bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
                   <BellRing size={16} className="mr-1" /> อนุมัติ
                   {pendingRequests.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingRequests.length}</span>}
@@ -1343,7 +1363,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
               </>
             )}
 
-            {/* พนักงานก็สามารถกดปุ่มแปลงได้แล้ว! (แต่จะเป็นการส่งขออนุมัติ) */}
             <button onClick={() => setShowConvertModal(true)} className="flex-1 md:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm"><ArrowRightLeft size={16} className="mr-1" /> {isEmployee ? "ขอแปลงสินค้า" : "แปลงสินค้า"}</button>
             
             {!isEmployee && (
@@ -1369,10 +1388,10 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
               <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-2">ชื่อสินค้า</label><input required type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white text-sm" /></div>
               <div><label className="block text-xs font-bold text-gray-600 mb-2">หมวดหมู่</label><input required type="text" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-white text-sm" placeholder="เช่น ข้าวถุง, ข้าวสาร" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-bold text-gray-600 mb-2">ราคาทุน</label><input required type="number" min="0" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-red-400 bg-red-50 text-sm text-right font-bold text-red-600" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-2">ราคาขาย</label><input required type="number" min="0" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-green-500 bg-green-50 text-sm text-right font-bold text-green-600" /></div>
+                <div><label className="block text-xs font-bold text-gray-600 mb-2">ราคาทุน</label><input required type="number" step="any" min="0" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-red-400 bg-red-50 text-sm text-right font-bold text-red-600" /></div>
+                <div><label className="block text-xs font-bold text-gray-600 mb-2">ราคาขาย</label><input required type="number" step="any" min="0" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-green-500 bg-green-50 text-sm text-right font-bold text-green-600" /></div>
               </div>
-              <div><label className="block text-xs font-bold text-gray-600 mb-2">จำนวนสต๊อก</label><input required type="number" min="0" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-blue-50 text-sm text-center font-bold text-blue-700" /></div>
+              <div><label className="block text-xs font-bold text-gray-600 mb-2">จำนวนสต๊อก</label><input required type="number" step="any" min="0" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:border-blue-500 bg-blue-50 text-sm text-center font-bold text-blue-700" /></div>
             </div>
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
               <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50 transition-colors">ยกเลิก</button>
@@ -1382,7 +1401,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
         </div>
       )}
 
-      {/* 🌟 Modal สำหรับพนักงาน/แอดมิน แปลงสินค้า */}
       {showConvertModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg">
@@ -1395,7 +1413,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                 <select required value={convertData.sourceId} onChange={(e) => setConvertData({ ...convertData, sourceId: e.target.value })} className="w-full mb-3 p-3 border border-orange-300 rounded-lg bg-white text-sm outline-none focus:border-orange-500"><option value="">-- เลือกสินค้า --</option>{(products || []).map((p) => (<option key={p.id} value={p.id}>{p.name} (มี {p.stock})</option>))}</select>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-orange-700">จำนวนที่นำมาแบ่ง:</span>
-                  <input required type="number" min="1" value={convertData.sourceQty} onChange={(e) => setConvertData({ ...convertData, sourceQty: e.target.value })} className="w-24 p-2 border border-orange-300 rounded-lg font-bold text-center outline-none focus:border-orange-500" />
+                  <input required type="number" step="any" min="0.01" value={convertData.sourceQty} onChange={(e) => setConvertData({ ...convertData, sourceQty: e.target.value })} className="w-24 p-2 border border-orange-300 rounded-lg font-bold text-center outline-none focus:border-orange-500" />
                 </div>
               </div>
               
@@ -1404,10 +1422,20 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
               <div className="p-5 bg-green-50 border border-green-200 rounded-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
                 <label className="block text-sm font-bold text-green-800 mb-3">2. สินค้าปลายทาง (ถุงเล็ก ที่จะเพิ่มเข้า)</label>
-                <select required value={convertData.targetId} onChange={(e) => setConvertData({ ...convertData, targetId: e.target.value })} className="w-full mb-3 p-3 border border-green-300 rounded-lg bg-white text-sm outline-none focus:border-green-500"><option value="">-- เลือกสินค้า --</option>{(products || []).map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-green-700">จำนวนถุงที่ได้:</span>
-                  <input required type="number" min="1" value={convertData.targetQty} onChange={(e) => setConvertData({ ...convertData, targetQty: e.target.value })} className="w-24 p-2 border border-green-300 rounded-lg font-bold text-center outline-none focus:border-green-500" />
+                <select required value={convertData.targetId} onChange={(e) => {
+                   const tId = e.target.value;
+                   const tProd = products.find(p => p.id === parseInt(tId));
+                   setConvertData({ ...convertData, targetId: tId, targetPrice: tProd ? tProd.price : "" });
+                }} className="w-full mb-3 p-3 border border-green-300 rounded-lg bg-white text-sm outline-none focus:border-green-500"><option value="">-- เลือกสินค้า --</option>{(products || []).map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-green-700">ได้จำนวน:</span>
+                    <input required type="number" step="any" min="0.01" value={convertData.targetQty} onChange={(e) => setConvertData({ ...convertData, targetQty: e.target.value })} className="w-20 p-2 border border-green-300 rounded-lg font-bold text-center outline-none focus:border-green-500" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-blue-700">ปรับราคาใหม่:</span>
+                    <input type="number" step="any" min="0" value={convertData.targetPrice} onChange={(e) => setConvertData({ ...convertData, targetPrice: e.target.value })} placeholder="ราคา" className="w-20 p-2 border border-blue-300 rounded-lg font-bold text-center outline-none focus:border-blue-500" />
+                  </div>
                 </div>
               </div>
 
@@ -1417,7 +1445,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
         </div>
       )}
 
-      {/* 🌟 Modal สำหรับแอดมินดูคำขออนุมัติ */}
       {showRequestModal && !isEmployee && (
          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
            <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-2xl">
@@ -1443,6 +1470,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                          <div className="text-xs text-gray-500 mb-1">เพิ่มเข้า</div>
                          <div className="font-bold text-green-700 text-sm">{req.targetName}</div>
                          <div className="font-black text-lg">+{req.targetQty}</div>
+                         {req.targetPrice && <div className="text-[10px] text-blue-600 mt-1">ตั้งราคาใหม่: ฿{req.targetPrice}</div>}
                       </div>
                    </div>
                    <div className="flex gap-2 mt-3">
@@ -1467,7 +1495,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
               {[...(products || [])].sort((a, b) => parseInt(a.barcode) - parseInt(b.barcode)).map((p) => (
                   <tr key={p.id} className="hover:bg-blue-50 transition-colors text-sm">
                     <td className="p-4 font-mono text-gray-500">{p.barcode}</td>
-                    {/* เปลี่ยนสีตัวหนังสือให้อ่านง่ายและชัดเจนขึ้น */}
                     <td className="p-4"><div className="font-bold text-gray-900 text-base">{p.name}</div><div className="text-xs text-gray-500 font-medium">{p.category}</div></td>
                     {!isEmployee && (<td className="p-4 text-right text-gray-400">฿{(p.cost || 0).toLocaleString()}</td>)}
                     <td className="p-4 text-right font-black text-green-700 text-lg">฿{(p.price || 0).toLocaleString()}</td>
@@ -1475,7 +1502,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                     <td className="p-4 text-center">{p.lastChecked ? (<div className="text-[10px] text-green-600 flex flex-col items-center bg-green-50 p-1.5 rounded-lg border border-green-100"><CheckSquare size={14} className="mb-0.5" /> <span>{p.lastChecked}</span></div>) : (<button onClick={() => handleCheckStock(p.id)} className="text-[10px] border border-blue-300 text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors font-bold">กดเช็คสต๊อก</button>)}</td>
                     {!isEmployee && (
                       <td className="p-4 text-center flex justify-center gap-1.5 mt-2">
-                        {/* 🌟 ปุ่มพิมพ์บาร์โค้ด */}
                         <button onClick={() => handlePrintBarcode(p)} title="พิมพ์บาร์โค้ด" className="text-gray-600 bg-gray-100 p-2 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200"><Printer size={16} /></button>
                         <button onClick={() => handleEdit(p)} title="แก้ไข" className="text-blue-500 bg-blue-50 p-2 hover:bg-blue-100 rounded-lg transition-colors"><Edit size={16} /></button>
                         <button onClick={() => handleDelete(p.id)} title="ลบ" className="text-red-500 bg-red-50 p-2 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={16} /></button>
@@ -2313,7 +2339,7 @@ function SettingsPanel({ settings, setSettings, currentBranch }) {
       printerSize: "80mm", 
       autoPrint: false, 
       pointSystem: { qtyPerPoint: 100, bahtPerPoint: 10 },
-      hardware: { scannerEnabled: true, wirelessPrinterIp: "", qrWalletEnabled: false }
+      hardware: { scannerEnabled: true, scannerDriver: "", wirelessPrinterIp: "", printerDriver: "", qrWalletEnabled: false }
     }
   );
 
@@ -2332,33 +2358,45 @@ function SettingsPanel({ settings, setSettings, currentBranch }) {
         <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-600"></div>
         <form onSubmit={handleSave}>
           
-          {/* ฮาร์ดแวร์ อุปกรณ์เสริม */}
+          {/* 🌟 หมวดหมู่ ฮาร์ดแวร์ */}
           <h3 className="font-bold text-lg mb-5 flex items-center text-gray-800">
             <ScanLine className="mr-2 text-indigo-500" /> อุปกรณ์ฮาร์ดแวร์ (Hardware)
           </h3>
           <div className="mb-5 bg-indigo-50 p-5 rounded-xl border border-indigo-100 space-y-4">
+            
             <div className="flex items-center justify-between">
               <label className="font-bold text-indigo-900 cursor-pointer">
-                 รองรับเครื่องสแกนบาร์โค้ด (Barcode Scanner)
+                 เปิดใช้ระบบรับค่าจากเครื่องสแกนบาร์โค้ด
               </label>
               <input type="checkbox" checked={localSettings.hardware?.scannerEnabled ?? true} onChange={(e) => setLocalSettings({...localSettings, hardware: {...localSettings.hardware, scannerEnabled: e.target.checked}})} className="w-5 h-5 accent-indigo-600 cursor-pointer" />
             </div>
+
+            <div className="pt-4 border-t border-indigo-200">
+              <label className="block text-sm font-bold text-indigo-900 mb-2">ไดรเวอร์ / พอร์ต เครื่องสแกน (ถ้ามี)</label>
+              <input type="text" value={localSettings.hardware?.scannerDriver || ""} onChange={(e) => setLocalSettings({...localSettings, hardware: {...localSettings.hardware, scannerDriver: e.target.value}})} placeholder="เช่น COM3 หรือ Driver Name" className="w-full p-3 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500 text-sm" />
+            </div>
             
             <div className="pt-4 border-t border-indigo-200">
-              <label className="block text-sm font-bold text-indigo-900 mb-2">IP Address เครื่องพิมพ์ไร้สาย (ถ้ามี)</label>
+              <label className="block text-sm font-bold text-indigo-900 mb-2">IP Address เครื่องพิมพ์ไร้สาย (Wi-Fi Printer)</label>
               <input type="text" value={localSettings.hardware?.wirelessPrinterIp || ""} onChange={(e) => setLocalSettings({...localSettings, hardware: {...localSettings.hardware, wirelessPrinterIp: e.target.value}})} placeholder="เช่น 192.168.1.100" className="w-full p-3 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500 font-mono text-sm" />
+            </div>
+
+            <div className="pt-4 border-t border-indigo-200">
+              <label className="block text-sm font-bold text-indigo-900 mb-2">ไดรเวอร์ เครื่องพิมพ์ (Printer Driver)</label>
+              <input type="text" value={localSettings.hardware?.printerDriver || ""} onChange={(e) => setLocalSettings({...localSettings, hardware: {...localSettings.hardware, printerDriver: e.target.value}})} placeholder="ชื่อไดรเวอร์เครื่องปริ้นในระบบ" className="w-full p-3 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500 text-sm" />
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-indigo-200">
               <label className="font-bold text-indigo-900 cursor-pointer flex items-center">
-                 แสดง QR Code (พร้อมเพย์/Wallet) บนใบเสร็จ <QrCode size={16} className="ml-2"/>
+                 แสดง QR Code Wallet / โอนเงิน บนสลิป <QrCode size={16} className="ml-2"/>
               </label>
               <input type="checkbox" checked={localSettings.hardware?.qrWalletEnabled ?? false} onChange={(e) => setLocalSettings({...localSettings, hardware: {...localSettings.hardware, qrWalletEnabled: e.target.checked}})} className="w-5 h-5 accent-indigo-600 cursor-pointer" />
             </div>
+
           </div>
 
           <h3 className="font-bold text-lg mb-5 flex items-center pt-6 border-t border-gray-100 text-gray-800">
-            <Printer className="mr-2 text-blue-500" /> เครื่องพิมพ์ใบเสร็จ (USB/Bluetooth)
+            <Printer className="mr-2 text-blue-500" /> เครื่องพิมพ์ใบเสร็จทั่วไป
           </h3>
           <div className="mb-5 bg-gray-50 p-5 rounded-xl border border-gray-100">
             <label className="block text-sm font-bold text-gray-700 mb-3">ขนาดกระดาษ</label>
@@ -2544,7 +2582,6 @@ function DatabaseManager({ onSeedData, onFullRestore, allData, addProduct, updat
 
   // --- ดาวน์โหลด Full Backup JSON ---
   const handleDownloadJSON = () => {
-    // โหลดทั้งหมดเพื่อสำรองข้อมูลที่สมบูรณ์
     const backupData = { timestamp: new Date().toISOString(), ...allData };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
