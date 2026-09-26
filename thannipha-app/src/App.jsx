@@ -47,6 +47,13 @@ const exportToPDF = (title, headers, rows, footerHtml = "") => {
 
 const callGeminiAPI = async (prompt) => { return "ฟีเจอร์ AI วิเคราะห์ข้อมูล"; };
 
+const ExportButtons = ({ onCSV, onPDF }) => (
+  <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+    <button onClick={onCSV} className="flex-1 md:flex-none justify-center bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center shadow-sm border border-emerald-200"><Download size={16} className="mr-1.5" /> Excel</button>
+    <button onClick={onPDF} className="flex-1 md:flex-none justify-center bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center shadow-sm border border-rose-200"><Printer size={16} className="mr-1.5" /> PDF</button>
+  </div>
+);
+
 // --- 🌟 APP COMPONENT หลัก 🌟 ---
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -73,7 +80,7 @@ export default function App() {
   const [receipts, setReceipts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [conversionRequests, setConversionRequests] = useState([]); 
-  const [stockSnapshots, setStockSnapshots] = useState([]); // 🌟 เพิ่มฐานข้อมูลเก็บสต็อกสิ้นวัน
+  const [stockSnapshots, setStockSnapshots] = useState([]); 
 
   useEffect(() => {
     const unsubs = [
@@ -98,7 +105,7 @@ export default function App() {
       onSnapshot(collection(db, "receipts"), (snap) => setReceipts(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(collection(db, "suppliers"), (snap) => setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(collection(db, "conversions"), (snap) => setConversionRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(collection(db, "stockSnapshots"), (snap) => setStockSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() })))) // 🌟 โหลดประวัติสต็อก
+      onSnapshot(collection(db, "stockSnapshots"), (snap) => setStockSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     ];
     return () => unsubs.forEach(unsub => unsub());
   }, []);
@@ -150,15 +157,13 @@ export default function App() {
   const addConversionRequest = (req) => saveToDB("conversions", req.id, { ...req, branch: currentBranch, status: "pending" });
   const approveConversion = (req) => saveToDB("conversions", req.id, { ...req, status: "approved" });
   const rejectConversion = (req) => saveToDB("conversions", req.id, { ...req, status: "rejected" });
-  
-  // 🌟 ฟังก์ชันเซฟสต็อกสิ้นวัน
   const addStockSnapshot = (snap) => saveToDB("stockSnapshots", snap.id, snap);
 
   const handleVoidSale = (sale) => {
-    if (!window.confirm(`ยืนยันการยกเลิกบิล ${sale.id} และคืนสต๊อกสินค้าทั้งหมดกลับเข้าคลังใช่หรือไม่?\n\n(ยอดขายและรายการนี้จะถูกลบออกจากประวัติ)`)) return;
+    if (!window.confirm(`ยืนยันการยกเลิกบิล ${sale.id} และคืนสต๊อกสินค้าทั้งหมดกลับเข้าคลังใช่หรือไม่?`)) return;
     (sale.items || []).forEach(item => {
       const product = branchProducts.find(p => p.id === item.id);
-      if (product) updateProduct({ ...product, stock: product.stock + (parseFloat(item.qty) || 0) });
+      if (product) updateProduct({ ...product, stock: (parseFloat(product.stock)||0) + (parseFloat(item.qty) || 0) });
     });
     delFromDB("salesHistory", sale.id);
     alert(`ยกเลิกบิล ${sale.id} และคืนสต๊อกเรียบร้อยแล้ว`);
@@ -188,7 +193,7 @@ export default function App() {
       if (data.debtors) data.debtors.forEach(d => addDebtor(d));
       if (data.suppliers) data.suppliers.forEach(s => addSupplier(s));
       if (data.receipts) data.receipts.forEach(r => saveToDB("receipts", r.id, r));
-      alert("กู้คืนข้อมูลสำเร็จ! ข้อมูลกำลังทำงานกับ Cloud...");
+      alert("กู้คืนข้อมูลสำเร็จ!");
     } catch (err) { alert("เกิดข้อผิดพลาดในการกู้คืน: " + err.message); }
   };
 
@@ -287,7 +292,6 @@ export default function App() {
           {currentTab === "debtors" && <DebtorManager debtors={debtors} updateDebtor={updateDebtor} deleteDebtor={deleteDebtor} addDebtor={addDebtor} customers={customers} debtPayments={debtPayments} addDebtPayment={addDebtPayment} currentUser={currentUser} currentBranch={currentBranch} />}
           {currentTab === "receive" && !isEmployee && <GoodsReceiptManager products={branchProducts} updateProduct={updateProduct} addReceipt={addReceipt} currentUser={currentUser} suppliers={suppliers} addSupplier={addSupplier} deleteSupplier={deleteSupplier} />}
           
-          {/* 🌟 ส่งข้อมูลสต็อกเก่าไปที่ Inventory */}
           {currentTab === "inventory" && <InventoryManager products={branchProducts} addProduct={addProduct} updateProduct={updateProduct} deleteProduct={deleteProduct} currentUser={currentUser} currentBranch={currentBranch} conversionRequests={branchConversions} addConversionRequest={addConversionRequest} approveConversion={approveConversion} rejectConversion={rejectConversion} stockSnapshots={branchStockSnapshots} addStockSnapshot={addStockSnapshot} />}
           
           {currentTab === "customers" && <CustomerManager customers={customers} addCustomer={addCustomer} updateCustomer={updateCustomer} deleteCustomer={deleteCustomer} currentUser={currentUser} />}
@@ -394,7 +398,6 @@ function ShiftManagement({ shiftState, setShiftState, salesHistory, currentUser,
     if (actualCash === "") return alert("กรุณาระบุยอดเงินสดที่นับได้จริง");
 
     const shiftSales = (salesHistory || []).filter((s) => s.timestamp >= shiftState.startTime);
-    // 🌟 คำนวณยอดเงินสดตามระบบ Split Payment ใหม่
     const cashSales = shiftSales.reduce((sum, s) => sum + (s.cashAmount || 0), 0);
     const transferSales = shiftSales.reduce((sum, s) => sum + (s.transferAmount || 0), 0);
     const welfareSales = shiftSales.reduce((sum, s) => sum + (s.welfareAmount || 0), 0);
@@ -403,8 +406,6 @@ function ShiftManagement({ shiftState, setShiftState, salesHistory, currentUser,
 
     const cashDebtCollection = (debtPayments || []).filter((p) => p.timestamp >= shiftState.startTime && p.method === "cash").reduce((sum, p) => sum + p.amount, 0);
     
-    // เงินในลิ้นชัก = ทอนเริ่มต้น + ยอดขายเฉพาะส่วนที่เป็นเงินสด + รับชำระหนี้ด้วยเงินสด - (เงินทอนที่ให้ลูกค้าไป)
-    // หมายเหตุ: ในระบบเรา Change คิดจาก Cash ไปแล้ว (Cash ยอดเต็มคือ CashReceived - Change = ยอดเข้าจริง) แต่ใน saleRecord เราเก็บ cashAmount เป็นยอดสุทธิที่เข้ากระเป๋า
     const expectedCash = shiftState.startingCash + cashSales + cashDebtCollection;
     const countedCash = Number(actualCash) || 0;
     const diff = countedCash - expectedCash;
@@ -515,7 +516,7 @@ function ShiftManagement({ shiftState, setShiftState, salesHistory, currentUser,
 }
 
 // ------------------------------------------
-// 1. ระบบขายสินค้า (POS) - 🌟 รองรับชำระแบบผสม (Split Payment)
+// 1. ระบบขายสินค้า (POS)
 // ------------------------------------------
 function POSSystem({ products, updateProduct, customers, updateCustomer, currentUser, onSaleComplete, settings, shiftState, onNavigate, onAddDebtor }) {
   const [cart, setCart] = useState([]);
@@ -524,7 +525,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
   const [discount, setDiscount] = useState(0); 
   const [usedPoints, setUsedPoints] = useState(0); 
   
-  // 🌟 Payment States สำหรับ Split Payment
   const [payCash, setPayCash] = useState("");
   const [payTransfer, setPayTransfer] = useState("");
   const [payWelfare, setPayWelfare] = useState("");
@@ -609,12 +609,10 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
   const totalCost = cart.reduce((sum, item) => sum + (parseFloat(item.cost) || 0) * (parseFloat(item.qty) || 0), 0);
   const total = Math.max(0, subtotal - totalDiscount);
   
-  // 🌟 คำนวณยอดเงินรวมแบบใหม่ (Split Payment)
   const totalPaid = (Number(payCash) || 0) + (Number(payTransfer) || 0) + (Number(payWelfare) || 0) + (Number(payCredit) || 0);
   const remainingToPay = Math.max(0, total - totalPaid);
   const change = Math.max(0, totalPaid - total);
 
-  // ฟังก์ชันคำนวณเงินพอดี สำหรับแต่ละช่อง
   const handleFillExact = (type) => {
     let currentOthers = 0;
     if(type !== 'cash') currentOthers += Number(payCash) || 0;
@@ -769,7 +767,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
     const saleId = "INV" + Date.now().toString().slice(-6);
     const timestamp = Date.now();
 
-    // 🌟 ระบบค้างจ่ายแยกยอด
     if (Number(payCredit) > 0) {
       const debtRecord = {
         id: `DEBT-${timestamp}`, customerId: selectedCustomer.id, saleId,
@@ -779,7 +776,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
       onAddDebtor(debtRecord);
     }
 
-    // 🌟 บันทึกบิลแบบแยกช่องทางการรับเงิน
     let mainPaymentMethod = "mixed";
     if(Number(payCash) >= total) mainPaymentMethod = "cash";
     else if(Number(payTransfer) >= total) mainPaymentMethod = "transfer";
@@ -795,7 +791,7 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
       items: cart.map(c => ({...c, qty: parseFloat(c.qty) || 0, price: parseFloat(c.price) || 0})),
       subtotal, totalCost, discount: totalDiscount, total, 
       paymentMethod: mainPaymentMethod,
-      cashAmount: finalCashAdded, // เงินสดเข้ากระเป๋าจริง (หักทอนแล้ว)
+      cashAmount: finalCashAdded,
       transferAmount: Number(payTransfer) || 0,
       welfareAmount: Number(payWelfare) || 0,
       creditAmount: Number(payCredit) || 0,
@@ -838,7 +834,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
           {showReceipt.discount > 0 && <div className="flex justify-between text-sm mt-1"><span>ส่วนลดรวม</span><span>- ฿{showReceipt.discount.toLocaleString()}</span></div>}
           <div className="flex justify-between text-lg font-bold mt-2 border-b border-dashed border-gray-400 print:border-black pb-2"><span>ยอดสุทธิ</span><span>฿{showReceipt.total.toLocaleString()}</span></div>
           
-          {/* 🌟 แสดงประวัติการจ่ายแบบผสมในสลิป */}
           {showReceipt.cashAmount > 0 && <div className="flex justify-between text-sm mt-2 text-gray-600 print:text-black"><span>รับเงินสด (หักทอน)</span><span>฿{showReceipt.cashAmount.toLocaleString()}</span></div>}
           {showReceipt.transferAmount > 0 && <div className="flex justify-between text-sm mt-1 text-gray-600 print:text-black"><span>เงินโอน</span><span>฿{showReceipt.transferAmount.toLocaleString()}</span></div>}
           {showReceipt.welfareAmount > 0 && <div className="flex justify-between text-sm mt-1 text-gray-600 print:text-black"><span>สวัสดิการแห่งรัฐ</span><span>฿{showReceipt.welfareAmount.toLocaleString()}</span></div>}
@@ -1005,7 +1000,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
           )}
         </div>
 
-        {/* 🌟 ปรับปรุงระบบชำระเงินแบบผสม (Split Payment) */}
         <div className="p-2 md:p-4 bg-white border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 shrink-0">
           <div className="space-y-1 mb-2">
             
@@ -1031,7 +1025,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
              <label className="text-[10px] md:text-xs font-bold text-gray-600 mb-2 block border-b pb-1">เลือกช่องทางรับเงิน (ใส่ยอดรวมกันได้)</label>
              <div className="grid grid-cols-2 gap-2">
                 
-                {/* เงินสด */}
                 <div className="bg-white border border-gray-200 p-1.5 rounded flex items-center">
                    <Banknote size={16} className="text-blue-500 mr-1.5 shrink-0"/>
                    <div className="flex-1">
@@ -1041,7 +1034,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
                    <button onClick={() => handleFillExact('cash')} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-1 rounded font-bold hover:bg-blue-200 shrink-0">พอดี</button>
                 </div>
 
-                {/* เงินโอน */}
                 <div className="bg-white border border-gray-200 p-1.5 rounded flex items-center">
                    <CreditCard size={16} className="text-purple-500 mr-1.5 shrink-0"/>
                    <div className="flex-1">
@@ -1051,7 +1043,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
                    <button onClick={() => handleFillExact('transfer')} className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-1 rounded font-bold hover:bg-purple-200 shrink-0">พอดี</button>
                 </div>
 
-                {/* สวัสดิการ */}
                 <div className="bg-white border border-gray-200 p-1.5 rounded flex items-center">
                    <CreditCard size={16} className="text-teal-500 mr-1.5 shrink-0"/>
                    <div className="flex-1">
@@ -1061,7 +1052,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
                    <button onClick={() => handleFillExact('welfare')} className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-1 rounded font-bold hover:bg-teal-200 shrink-0">พอดี</button>
                 </div>
 
-                {/* ค้างจ่าย (เครดิต) */}
                 <div className="bg-white border border-gray-200 p-1.5 rounded flex items-center">
                    <BookUser size={16} className="text-orange-500 mr-1.5 shrink-0"/>
                    <div className="flex-1">
@@ -1073,7 +1063,6 @@ function POSSystem({ products, updateProduct, customers, updateCustomer, current
 
              </div>
 
-             {/* สรุปเงินทอน หรือ ยอดขาด */}
              <div className="mt-2 pt-2 border-t border-dashed flex justify-between items-center">
                <span className="text-xs font-bold text-gray-500">รับมาทั้งหมด: ฿{totalPaid.toLocaleString()}</span>
                {totalPaid >= total ? (
@@ -1282,7 +1271,7 @@ function DebtorManager({ debtors, updateDebtor, deleteDebtor, addDebtor, custome
 // ------------------------------------------
 function InventoryManager({ products, addProduct, updateProduct, deleteProduct, currentUser, currentBranch, conversionRequests, addConversionRequest, approveConversion, rejectConversion, stockSnapshots, addStockSnapshot }) {
   const isEmployee = currentUser.role === "employee";
-  const [activeTab, setActiveTab] = useState("inventory"); // 'inventory' | 'history'
+  const [activeTab, setActiveTab] = useState("inventory"); 
   
   const [isEditing, setIsEditing] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -1362,9 +1351,9 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
       addConversionRequest({
         id: `CONV-${Date.now()}`,
         sourceId: source.id,
-        sourceName: `[${source.barcode}] ${source.name}`, 
+        sourceName: `[${source.barcode}] ${source.name}`, // 🌟 โชว์รหัสบาร์โค้ดไปให้แอดมิน
         targetId: target.id,
-        targetName: `[${target.barcode}] ${target.name}`,
+        targetName: `[${target.barcode}] ${target.name}`, // 🌟 โชว์รหัสบาร์โค้ด
         sourceQty: sQty,
         targetQty: tQty,
         targetPrice: newPrice || null,
@@ -1444,14 +1433,13 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
     reader.readAsText(file, "utf-8");
   };
 
-  // 🌟 ฟังก์ชันบันทึกสต็อกรายวัน (Snapshot)
+  // 🌟 ฟังก์ชันบันทึกสต็อกรายวัน
   const handleSaveStockSnapshot = () => {
     if (!window.confirm("ยืนยันการบันทึกยอดสต็อกของวันนี้ใช่หรือไม่?\n(แนะนำให้กดเฉพาะตอนปิดร้าน หรือเวลา 20.30 น. ของแต่ละวันเท่านั้น)")) return;
     
-    const todayStr = new Date().toISOString().split("T")[0]; // สร้างคีย์ด้วยวันที่ YYYY-MM-DD
+    const todayStr = new Date().toISOString().split("T")[0]; 
     const snapId = `SNAP-${currentBranch}-${todayStr}`;
     
-    // ตรวจสอบว่าวันนี้บันทึกไปแล้วหรือยัง
     const existSnap = (stockSnapshots || []).find(s => s.id === snapId);
     if (existSnap) {
       if (!window.confirm("วันนี้มีการบันทึกสต็อกไปแล้ว คุณต้องการบันทึก 'ทับ' ยอดเดิมของวันนี้หรือไม่?")) return;
@@ -1481,7 +1469,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
   const headers = isEmployee ? ["รหัส", "ชื่อสินค้า", "ราคาขาย", "คงเหลือ"] : ["รหัส", "ชื่อสินค้า", "หมวดหมู่", "ราคาทุน", "ราคาขาย", "คงเหลือ"];
   const rows = [...(products || [])].map((p) => isEmployee ? [p.barcode, p.name, p.price, p.stock] : [p.barcode, p.name, p.category, p.cost, p.price, p.stock]);
 
-  // ดึงข้อมูล Snapshot ของวันที่เลือก
   const selectedSnapshot = (stockSnapshots || []).find(s => s.date === snapDate && s.branch === currentBranch);
 
   return (
@@ -1491,7 +1478,6 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
            <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center"><Package className="mr-2 text-blue-600"/> คลังสินค้า <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-lg border border-blue-200">สาขาที่ {currentBranch}</span></h2>
         </div>
         
-        {/* 🌟 ปุ่มแท็บเลือกโหมด คลังปัจจุบัน / ดูย้อนหลัง */}
         <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
           <button onClick={() => setActiveTab("inventory")} className={`flex-1 md:px-6 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === "inventory" ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:bg-gray-100"}`}>คลังสินค้าปัจจุบัน</button>
           {!isEmployee && (
@@ -1527,7 +1513,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                   <button onClick={() => { setIsEditing(true); setFormData({ id: null, barcode: "", name: "", category: "", cost: "", price: "", stock: "" }); }} className="flex-1 md:flex-none justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm"><Plus size={16} className="mr-1" /> เพิ่ม</button>
                   {/* 🌟 ปุ่มบันทึกสต็อกรายวัน (เฉพาะแอดมิน) */}
                   <button onClick={handleSaveStockSnapshot} className="w-full md:w-auto mt-2 md:mt-0 justify-center bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center transition-colors shadow-sm">
-                    <Save size={16} className="mr-1.5 text-blue-300" /> บันทึกสต็อกสิ้นวัน (20.30 น.)
+                    <Save size={16} className="mr-1.5 text-blue-300" /> บันทึกสต็อกสิ้นวัน
                   </button>
                 </>
               )}
@@ -1668,6 +1654,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                 <label className="block text-sm font-bold text-orange-800 mb-3">1. สินค้าต้นทาง (กระสอบ/กระบุง ที่จะหักออก)</label>
                 <select required value={convertData.sourceId} onChange={(e) => setConvertData({ ...convertData, sourceId: e.target.value })} className="w-full mb-3 p-3 border border-orange-300 rounded-lg bg-white text-sm outline-none focus:border-orange-500">
                    <option value="">-- เลือกสินค้า --</option>
+                   {/* 🌟 แสดงรหัสบาร์โค้ดในหน้าเลือกสินค้า */}
                    {(products || []).map((p) => (<option key={p.id} value={p.id}>[{p.barcode}] {p.name} (มี {p.stock})</option>))}
                 </select>
                 <div className="flex items-center gap-3">
@@ -1687,6 +1674,7 @@ function InventoryManager({ products, addProduct, updateProduct, deleteProduct, 
                    setConvertData({ ...convertData, targetId: tId, targetPrice: tProd ? tProd.price : "" });
                 }} className="w-full mb-3 p-3 border border-green-300 rounded-lg bg-white text-sm outline-none focus:border-green-500">
                    <option value="">-- เลือกสินค้า --</option>
+                   {/* 🌟 แสดงรหัสบาร์โค้ดในหน้าเลือกสินค้า */}
                    {(products || []).map((p) => (<option key={p.id} value={p.id}>[{p.barcode}] {p.name}</option>))}
                 </select>
                 <div className="flex items-center justify-between gap-3">
